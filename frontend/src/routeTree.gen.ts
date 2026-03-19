@@ -16,9 +16,16 @@ import { Route as rootRoute } from './routes/__root'
 
 // Create Virtual Routes
 
+const PostsLazyImport = createFileRoute('/posts')()
 const IndexLazyImport = createFileRoute('/')()
 
 // Create/Update Routes
+
+const PostsLazyRoute = PostsLazyImport.update({
+  id: '/posts',
+  path: '/posts',
+  getParentRoute: () => rootRoute,
+} as any).lazy(() => import('./routes/posts.lazy').then((d) => d.Route))
 
 const IndexLazyRoute = IndexLazyImport.update({
   id: '/',
@@ -37,6 +44,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexLazyImport
       parentRoute: typeof rootRoute
     }
+    '/posts': {
+      id: '/posts'
+      path: '/posts'
+      fullPath: '/posts'
+      preLoaderRoute: typeof PostsLazyImport
+      parentRoute: typeof rootRoute
+    }
   }
 }
 
@@ -44,32 +58,37 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexLazyRoute
+  '/posts': typeof PostsLazyRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexLazyRoute
+  '/posts': typeof PostsLazyRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexLazyRoute
+  '/posts': typeof PostsLazyRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/posts'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/posts'
+  id: '__root__' | '/' | '/posts'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexLazyRoute: typeof IndexLazyRoute
+  PostsLazyRoute: typeof PostsLazyRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexLazyRoute: IndexLazyRoute,
+  PostsLazyRoute: PostsLazyRoute,
 }
 
 export const routeTree = rootRoute
@@ -82,11 +101,15 @@ export const routeTree = rootRoute
     "__root__": {
       "filePath": "__root.tsx",
       "children": [
-        "/"
+        "/",
+        "/posts"
       ]
     },
     "/": {
       "filePath": "index.lazy.tsx"
+    },
+    "/posts": {
+      "filePath": "posts.lazy.tsx"
     }
   }
 }
