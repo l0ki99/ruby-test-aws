@@ -1,0 +1,23 @@
+services:
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/backend
+    command: ['rails', 'server', '-b', '0.0.0.0', '-p', '8090']
+    ports:
+      - '8090:8090'
+    environment:
+      - DATABASE_URL=sqlite3:db/development.sqlite3
+      - RAILS_ENV=development
+
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/frontend
+      - /frontend/node_modules
+    ports:
+      - '8091:8091'
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - backend
