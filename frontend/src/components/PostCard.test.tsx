@@ -14,6 +14,18 @@ describe('PostCard', () => {
   });
 });
 
+describe('PostCard comment counter', () => {
+  it('displays the comment count next to the title', () => {
+    render(<PostCard title="Test" commentCounter={5} />);
+    expect(screen.getByText('(5)')).toBeDefined();
+  });
+
+  it('displays (0) when there are no comments', () => {
+    render(<PostCard title="Test" commentCounter={0} />);
+    expect(screen.getByText('(0)')).toBeDefined();
+  });
+});
+
 describe('PostCard image URL', () => {
   afterEach(() => {
     vi.unstubAllEnvs();

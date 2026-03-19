@@ -77,6 +77,29 @@ describe('PostsPage', () => {
     });
   });
 
+  it('passes commentCounter to PostCard so the count is displayed', async () => {
+    const mocks = [
+      {
+        request: {query: GET_DATA},
+        result: {
+          data: {
+            posts: [
+              {id: '1', title: 'Busy Post', imageUrl: null, commentCounter: 7},
+            ],
+          },
+        },
+      },
+    ];
+    render(
+      <MockedProvider mocks={mocks} addTypename={false}>
+        <PostsPage />
+      </MockedProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('(7)')).toBeDefined();
+    });
+  });
+
   it('passes imageUrl to PostCard so the image is rendered', async () => {
     vi.stubEnv('VITE_API_BASE_URL', 'http://test-api:8090');
     const mocks = [
