@@ -5,6 +5,7 @@ export const GET_DATA = gql`
     posts {
       id
       title
+      imageUrl
     }
   }
 `;

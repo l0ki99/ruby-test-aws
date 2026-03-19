@@ -2,18 +2,19 @@ import {Card, CardContent, CardMedia, Typography} from '@mui/material';
 
 interface PostCardProps {
   title: string;
+  imageUrl?: string | null;
 }
 
-export function PostCard({title}: PostCardProps) {
+export function PostCard({title, imageUrl}: PostCardProps) {
   return (
     <Card sx={{width: 300}}>
       <CardMedia
+        component="img"
+        height={300}
+        image={imageUrl ? (imageUrl.startsWith('/') ? `${import.meta.env.VITE_API_BASE_URL}${imageUrl}` : imageUrl) : undefined}
         sx={{
-          height: 300,
           backgroundColor: '#000',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          objectFit: 'cover',
         }}
       />
       <CardContent>

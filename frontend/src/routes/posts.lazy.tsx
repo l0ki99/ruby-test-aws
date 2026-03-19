@@ -23,8 +23,8 @@ function PostsPage() {
         </Typography>
       )}
       <Stack direction="row" flexWrap="wrap" gap={2}>
-        {data?.posts.map((post: {id: string; title: string}) => (
-          <PostCard key={post.id} title={post.title} />
+        {data?.posts.map((post: {id: string; title: string; imageUrl?: string | null}) => (
+          <PostCard key={post.id} title={post.title} imageUrl={post.imageUrl} />
         ))}
       </Stack>
     </Container>
