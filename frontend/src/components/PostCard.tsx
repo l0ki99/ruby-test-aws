@@ -3,9 +3,10 @@ import {Card, CardContent, CardMedia, Typography} from '@mui/material';
 interface PostCardProps {
   title: string;
   imageUrl?: string | null;
+  commentCounter: number;
 }
 
-export function PostCard({title, imageUrl}: PostCardProps) {
+export function PostCard({title, imageUrl, commentCounter}: PostCardProps) {
   return (
     <Card sx={{width: 300}}>
       <CardMedia
@@ -18,8 +19,9 @@ export function PostCard({title, imageUrl}: PostCardProps) {
         }}
       />
       <CardContent>
-        <Typography variant="subtitle1" fontWeight="bold">
-          {title}
+        <Typography variant="subtitle1" fontWeight="bold" display="flex" justifyContent="space-between">
+          <span>{title}</span>
+          <span>({commentCounter})</span>
         </Typography>
       </CardContent>
     </Card>
