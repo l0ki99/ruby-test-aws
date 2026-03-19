@@ -1,9 +1,10 @@
 import {render, screen} from '@testing-library/react';
 import {describe, it, expect} from 'vitest';
-import App, {GET_DATA} from './App';
+import App from './App';
+import {GET_DATA} from './queries/get_posts';
 import React from 'react';
 import {ApolloClient, InMemoryCache, ApolloProvider} from '@apollo/client';
-import {MockedProvider} from '@apollo/client/testing';
+import {MockedProvider, MockedResponse} from '@apollo/client/testing';
 
 const client = new ApolloClient({
   cache: new InMemoryCache(),
@@ -16,7 +17,7 @@ export const renderWithApollo = (ui: React.ReactElement) => {
 
 export const renderWithMockedProvider = (
   ui: React.ReactElement,
-  mocks: any[],
+  mocks: MockedResponse[],
 ) => {
   return render(
     <MockedProvider mocks={mocks} addTypename={false}>

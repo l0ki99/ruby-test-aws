@@ -8,7 +8,7 @@ export const Route = createLazyFileRoute('/posts')({
   component: PostsPage,
 });
 
-function PostsPage() {
+export function PostsPage() {
   const {data, loading, error} = useQuery(GET_DATA);
 
   return (
