@@ -74,6 +74,20 @@ class Resolvers::PostResolverTest < ActiveSupport::TestCase
     Rails.cache = original_cache
   end
 
+  test "succeeds when request is present in context" do
+    result = BackendSchema.execute("{ posts { id } }", context: { request: mock_request })
+
+    assert_nil result["errors"]
+    assert_kind_of Array, result["data"]["posts"]
+  end
+
+  test "returns an error when request is missing from context" do
+    result = BackendSchema.execute("{ posts { id } }", context: {})
+
+    assert_not_nil result["errors"]
+    assert_nil result["data"]
+  end
+
   private
 
   def mock_request

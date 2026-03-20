@@ -10,6 +10,8 @@ module Resolvers
     MAX_POSTS_PER_PAGE = 50
     
     def resolve(page: 1, per_page: 20)
+      raise GraphQL::ExecutionError, "Missing request context" unless context[:request]
+
       started_at = Time.current
 
       cache_key = "posts_request_#{context[:request].remote_ip}"
