@@ -147,6 +147,86 @@ class Resolvers::PostResolverTest < ActiveSupport::TestCase
     Rails.cache = original_cache
   end
 
+  test "returns posts sorted by NEWEST (created_at desc) by default" do
+    older_post = Post.create!(title: "Older", content: "content", user: @user, created_at: 2.days.ago)
+    newer_post = Post.create!(title: "Newer", content: "content", user: @user, created_at: 1.day.ago)
+
+    result = BackendSchema.execute("{ posts { id } }", context: { request: mock_request })
+    ids = result["data"]["posts"].map { |p| p["id"] }
+
+    assert ids.index(newer_post.id.to_s) < ids.index(older_post.id.to_s),
+           "Expected newer post before older post with NEWEST sort"
+  ensure
+    older_post.destroy
+    newer_post.destroy
+  end
+
+  test "returns posts sorted by OLDEST (created_at asc)" do
+    older_post = Post.create!(title: "Older", content: "content", user: @user, created_at: 2.days.ago)
+    newer_post = Post.create!(title: "Newer", content: "content", user: @user, created_at: 1.day.ago)
+
+    result = BackendSchema.execute('{ posts(sortBy: OLDEST) { id } }', context: { request: mock_request })
+    ids = result["data"]["posts"].map { |p| p["id"] }
+
+    assert ids.index(older_post.id.to_s) < ids.index(newer_post.id.to_s),
+           "Expected older post before newer post with OLDEST sort"
+  ensure
+    older_post.destroy
+    newer_post.destroy
+  end
+
+  test "returns posts sorted by AUTHOR_AZ (author name asc)" do
+    user_z = User.create!(email: "z@example.com", name: "Zara")
+    user_a = User.create!(email: "a@example.com", name: "Aaron")
+    post_z = Post.create!(title: "Zara's Post", content: "content", user: user_z)
+    post_a = Post.create!(title: "Aaron's Post", content: "content", user: user_a)
+
+    result = BackendSchema.execute('{ posts(sortBy: AUTHOR_AZ) { id } }', context: { request: mock_request })
+    ids = result["data"]["posts"].map { |p| p["id"] }
+
+    assert ids.index(post_a.id.to_s) < ids.index(post_z.id.to_s),
+           "Expected Aaron's post before Zara's post with AUTHOR_AZ sort"
+  ensure
+    post_z.destroy
+    post_a.destroy
+    user_z.destroy
+    user_a.destroy
+  end
+
+  test "returns posts sorted by AUTHOR_ZA (author name desc)" do
+    user_z = User.create!(email: "z2@example.com", name: "Zara")
+    user_a = User.create!(email: "a2@example.com", name: "Aaron")
+    post_z = Post.create!(title: "Zara's Post", content: "content", user: user_z)
+    post_a = Post.create!(title: "Aaron's Post", content: "content", user: user_a)
+
+    result = BackendSchema.execute('{ posts(sortBy: AUTHOR_ZA) { id } }', context: { request: mock_request })
+    ids = result["data"]["posts"].map { |p| p["id"] }
+
+    assert ids.index(post_z.id.to_s) < ids.index(post_a.id.to_s),
+           "Expected Zara's post before Aaron's post with AUTHOR_ZA sort"
+  ensure
+    post_z.destroy
+    post_a.destroy
+    user_z.destroy
+    user_a.destroy
+  end
+
+  test "sort_by is included in the cache key so different sorts are cached separately" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+
+    BackendSchema.execute('{ posts(sortBy: NEWEST) { id } }', context: { request: mock_request })
+    BackendSchema.execute('{ posts(sortBy: OLDEST) { id } }', context: { request: mock_request })
+
+    newest_key = Rails.cache.instance_variable_get(:@data).keys.find { |k| k.include?("NEWEST") }
+    oldest_key = Rails.cache.instance_variable_get(:@data).keys.find { |k| k.include?("OLDEST") }
+
+    assert_not_nil newest_key, "Expected a cache entry for NEWEST sort"
+    assert_not_nil oldest_key, "Expected a cache entry for OLDEST sort"
+  ensure
+    Rails.cache = original_cache
+  end
+
   private
 
   def mock_request

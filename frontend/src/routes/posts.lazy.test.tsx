@@ -1,10 +1,10 @@
-import {render, screen, waitFor} from '@testing-library/react';
+import {render, screen, waitFor, fireEvent} from '@testing-library/react';
 import {describe, it, expect, vi, afterEach} from 'vitest';
 import {MockedProvider} from '@apollo/client/testing';
 import {GET_DATA} from '../queries/get_posts';
 import {PostsPage, PAGE, PER_PAGE} from './posts.lazy';
 
-const DEFAULT_VARIABLES = {page: PAGE, perPage: PER_PAGE};
+const DEFAULT_VARIABLES = {page: PAGE, perPage: PER_PAGE, sortBy: 'NEWEST'};
 
 describe('PostsPage', () => {
   afterEach(() => {
@@ -144,5 +144,38 @@ describe('PostsPage', () => {
       const srcs = images.map((img) => img.getAttribute('src'));
       expect(srcs).toContain('http://test-api:8090/cat.png');
     });
+  });
+
+  it('renders a sort dropdown defaulting to Newest first', () => {
+    render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <PostsPage />
+      </MockedProvider>,
+    );
+    expect(screen.getByText('Newest first')).toBeDefined();
+  });
+
+  it('refetches with OLDEST sort when the user changes the dropdown', async () => {
+    const newestMock = {
+      request: {query: GET_DATA, variables: DEFAULT_VARIABLES},
+      result: {data: {posts: [{id: '1', title: 'Newest Post', content: 'content', imageUrl: null, commentCounter: 0}]}},
+    };
+    const oldestMock = {
+      request: {query: GET_DATA, variables: {...DEFAULT_VARIABLES, sortBy: 'OLDEST'}},
+      result: {data: {posts: [{id: '2', title: 'Oldest Post', content: 'content', imageUrl: null, commentCounter: 0}]}},
+    };
+
+    render(
+      <MockedProvider mocks={[newestMock, oldestMock]} addTypename={false}>
+        <PostsPage />
+      </MockedProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Newest Post')).toBeDefined());
+
+    fireEvent.mouseDown(screen.getByRole('combobox', {name: /sort posts by/i}));
+    fireEvent.click(screen.getByText('Oldest first'));
+
+    await waitFor(() => expect(screen.getByText('Oldest Post')).toBeDefined());
   });
 });

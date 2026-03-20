@@ -9,11 +9,18 @@ module Resolvers
     CACHE_EXPIRY = 30.minutes
     MAX_POSTS_PER_PAGE = 50
     RATE_LIMIT_MAX_REQUESTS = 100
+    SORT_ORDER = {
+      "NEWEST"    => "posts.created_at DESC",
+      "OLDEST"    => "posts.created_at ASC",
+      "AUTHOR_AZ" => "users.name ASC",
+      "AUTHOR_ZA" => "users.name DESC",
+    }.freeze
 
     argument :page, Integer, required: false, default_value: 1
     argument :per_page, Integer, required: false, default_value: 20
+    argument :sort_by, Types::PostSortEnum, required: false, default_value: "NEWEST"
 
-    def resolve(page:, per_page:)
+    def resolve(page:, per_page:, sort_by:)
       unless context[:request]
         Rails.logger.error("PostResolver: request missing from GraphQL context")
         raise GraphQL::ExecutionError, "Internal server error"
@@ -33,11 +40,14 @@ module Resolvers
       end
 
       clamped_per_page = [per_page, MAX_POSTS_PER_PAGE].min
-      cache_key = "all_posts_#{page}_#{clamped_per_page}_#{Post.maximum(:updated_at)&.to_i}"
+      cache_key = "all_posts_#{page}_#{clamped_per_page}_#{sort_by}_#{Post.maximum(:updated_at)&.to_i}"
       posts = Rails.cache.fetch(cache_key, expires_in: CACHE_EXPIRY) do
         offset = (page - 1) * clamped_per_page
+        order = SORT_ORDER[sort_by]
 
-        Post.includes(comments: :user).offset(offset).limit(clamped_per_page).to_a
+        scope = Post.includes(comments: :user)
+        scope = scope.joins(:user) if sort_by.start_with?("AUTHOR")
+        scope.order(order).offset(offset).limit(clamped_per_page).to_a
       end
 
       filtered_posts = posts.map do |post|
