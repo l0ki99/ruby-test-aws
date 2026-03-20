@@ -8,7 +8,14 @@ module Types
     field :content, String, null: false
     field :image_url, String, null: true
     field :comment_counter, Integer, null: false
-    field :comments, [Types::CommentType], null: false
+    field :comments, [Types::CommentType], null: false do
+      argument :limit, Integer, required: false, default_value: 20
+      argument :offset, Integer, required: false, default_value: 0
+    end
+
+    def comments(limit:, offset:)
+      dataloader.with(Sources::CommentsSource, limit: limit, offset: offset).load(object.id)
+    end
     field :created_at, GraphQL::Types::ISO8601DateTime, null: false
     field :updated_at, GraphQL::Types::ISO8601DateTime, null: false
   end
