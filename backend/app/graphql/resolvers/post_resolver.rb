@@ -10,7 +10,8 @@ module Resolvers
     MAX_POSTS_PER_PAGE = 50
     
     def resolve(page: 1, per_page: 20)
-      
+      started_at = Time.current
+
       cache_key = "posts_request_#{context[:request].remote_ip}"
       request_count = Rails.cache.fetch(cache_key, expires_in: 1.hour) { 0 }
       Rails.cache.write(cache_key, request_count + 1, expires_in: 1.hour)
@@ -23,16 +24,10 @@ module Resolvers
       posts = Rails.cache.fetch(cache_key, expires_in: CACHE_EXPIRY) do
         per_page = [per_page, MAX_POSTS_PER_PAGE].min
         offset = (page - 1) * per_page
-        
-        Post.all.offset(offset).limit(per_page)
+
+        Post.includes(comments: :user).offset(offset).limit(per_page).to_a
       end
-      
-      posts.each do |post|
-        post.comments.each do |comment|
-          comment.user.reload
-        end
-      end
-      
+
       filtered_posts = posts.map do |post|
         censored_content = post.content.dup
         PROFANITY_LIST.each do |word|
@@ -49,7 +44,7 @@ module Resolvers
         post
       end
       
-      Rails.logger.info("Posts query executed in #{Time.current - Time.current.at_beginning_of_request} seconds")
+      Rails.logger.info("Posts query executed in #{Time.current - started_at} seconds")
       
       filtered_posts
     end

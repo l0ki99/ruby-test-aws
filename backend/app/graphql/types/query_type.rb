@@ -18,12 +18,7 @@ module Types
       ids.map { |id| context.schema.object_from_id(id, context) }
     end
 
-    field :posts, [Types::PostType], null: false
-
-    def posts
-      sleep 2
-      Post.all
-    end
+    field :posts, resolver: Resolvers::PostResolver
 
     field :user, resolver: Resolvers::UserResolver
 
