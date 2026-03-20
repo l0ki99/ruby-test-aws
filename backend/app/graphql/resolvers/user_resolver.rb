@@ -2,14 +2,12 @@
 
 module Resolvers
   class UserResolver < Resolvers::BaseResolver
-    type [Types::UserType], null: false
+    type Types::UserType, null: true
 
-    argument :id, String, required: false
+    argument :id, ID, required: true
 
-    def resolve(id: nil)
-      users = User.all
-      users = users.where(id) if id.present?
-      users
+    def resolve(id:)
+      User.find_by(id: id) || raise(GraphQL::ExecutionError, "User not found")
     end
   end
 end

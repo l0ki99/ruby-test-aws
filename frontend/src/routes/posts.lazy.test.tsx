@@ -2,7 +2,9 @@ import {render, screen, waitFor} from '@testing-library/react';
 import {describe, it, expect, vi, afterEach} from 'vitest';
 import {MockedProvider} from '@apollo/client/testing';
 import {GET_DATA} from '../queries/get_posts';
-import {PostsPage} from './posts.lazy';
+import {PostsPage, PAGE, PER_PAGE} from './posts.lazy';
+
+const DEFAULT_VARIABLES = {page: PAGE, perPage: PER_PAGE};
 
 describe('PostsPage', () => {
   afterEach(() => {
@@ -18,11 +20,11 @@ describe('PostsPage', () => {
     expect(screen.getByRole('progressbar')).toBeDefined();
   });
 
-  it('shows an error message when the query fails', async () => {
+  it('shows a network error message when the request fails', async () => {
     const mocks = [
       {
-        request: {query: GET_DATA},
-        error: new Error('Network error'),
+        request: {query: GET_DATA, variables: DEFAULT_VARIABLES},
+        error: new Error('Failed to fetch'),
       },
     ];
     render(
@@ -31,14 +33,31 @@ describe('PostsPage', () => {
       </MockedProvider>,
     );
     await waitFor(() => {
-      expect(screen.getByText(/Failed to load posts/i)).toBeDefined();
+      expect(screen.getByText(/Network error: unable to reach the server/i)).toBeDefined();
+    });
+  });
+
+  it('shows a GraphQL error message when the server returns an error', async () => {
+    const mocks = [
+      {
+        request: {query: GET_DATA, variables: DEFAULT_VARIABLES},
+        result: {errors: [{message: 'Rate limit exceeded. Try again later.'}]},
+      },
+    ];
+    render(
+      <MockedProvider mocks={mocks} addTypename={false}>
+        <PostsPage />
+      </MockedProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/Rate limit exceeded/i)).toBeDefined();
     });
   });
 
   it('renders no cards when there are no posts', async () => {
     const mocks = [
       {
-        request: {query: GET_DATA},
+        request: {query: GET_DATA, variables: DEFAULT_VARIABLES},
         result: {data: {posts: []}},
       },
     ];
@@ -55,12 +74,12 @@ describe('PostsPage', () => {
   it('renders a card for each post with the correct title', async () => {
     const mocks = [
       {
-        request: {query: GET_DATA},
+        request: {query: GET_DATA, variables: DEFAULT_VARIABLES},
         result: {
           data: {
             posts: [
-              {id: '1', title: 'First Post', imageUrl: null, commentCounter: 0},
-              {id: '2', title: 'Second Post', imageUrl: null, commentCounter: 0},
+              {id: '1', title: 'First Post', content: 'First content', imageUrl: null, commentCounter: 0},
+              {id: '2', title: 'Second Post', content: 'Second content', imageUrl: null, commentCounter: 0},
             ],
           },
         },
@@ -80,11 +99,11 @@ describe('PostsPage', () => {
   it('passes commentCounter to PostCard so the count is displayed', async () => {
     const mocks = [
       {
-        request: {query: GET_DATA},
+        request: {query: GET_DATA, variables: DEFAULT_VARIABLES},
         result: {
           data: {
             posts: [
-              {id: '1', title: 'Busy Post', imageUrl: null, commentCounter: 7},
+              {id: '1', title: 'Busy Post', content: 'Busy content', imageUrl: null, commentCounter: 7},
             ],
           },
         },
@@ -104,12 +123,12 @@ describe('PostsPage', () => {
     vi.stubEnv('VITE_API_BASE_URL', 'http://test-api:8090');
     const mocks = [
       {
-        request: {query: GET_DATA},
+        request: {query: GET_DATA, variables: DEFAULT_VARIABLES},
         result: {
           data: {
             posts: [
-              {id: '1', title: 'Cat Post', imageUrl: '/cat.png', commentCounter: 0},
-              {id: '2', title: 'No Image Post', imageUrl: null, commentCounter: 0},
+              {id: '1', title: 'Cat Post', content: 'Cat content', imageUrl: '/cat.png', commentCounter: 0},
+              {id: '2', title: 'No Image Post', content: 'No image content', imageUrl: null, commentCounter: 0},
             ],
           },
         },

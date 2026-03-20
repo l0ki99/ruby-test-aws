@@ -85,7 +85,66 @@ class Resolvers::PostResolverTest < ActiveSupport::TestCase
     result = BackendSchema.execute("{ posts { id } }", context: {})
 
     assert_not_nil result["errors"]
+    assert_equal "Internal server error", result["errors"].first["message"]
     assert_nil result["data"]
+  end
+
+  test "returns an error when page is less than 1" do
+    result = BackendSchema.execute("{ posts(page: 0) { id } }", context: { request: mock_request })
+
+    assert_not_nil result["errors"]
+    assert_match "page must be >= 1", result["errors"].first["message"]
+  end
+
+  test "returns an error when per_page is 0" do
+    result = BackendSchema.execute("{ posts(perPage: 0) { id } }", context: { request: mock_request })
+
+    assert_not_nil result["errors"]
+    assert_match "per_page must be between", result["errors"].first["message"]
+  end
+
+  test "returns an error when per_page exceeds maximum" do
+    result = BackendSchema.execute("{ posts(perPage: 51) { id } }", context: { request: mock_request })
+
+    assert_not_nil result["errors"]
+    assert_match "per_page must be between", result["errors"].first["message"]
+  end
+
+  test "accepts valid page and per_page arguments" do
+    result = BackendSchema.execute("{ posts(page: 1, perPage: 10) { id } }", context: { request: mock_request })
+
+    assert_nil result["errors"]
+    assert_kind_of Array, result["data"]["posts"]
+  end
+
+  test "returns an error when rate limit is exceeded" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+
+    cache_key = "posts_request_127.0.0.1"
+    Rails.cache.write(cache_key, Resolvers::PostResolver::RATE_LIMIT_MAX_REQUESTS + 1, expires_in: 1.hour)
+
+    result = BackendSchema.execute("{ posts { id } }", context: { request: mock_request })
+
+    assert_not_nil result["errors"]
+    assert_match "Rate limit exceeded", result["errors"].first["message"]
+  ensure
+    Rails.cache = original_cache
+  end
+
+  test "repeated requests with the same per_page share a cache entry" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+
+    BackendSchema.execute("{ posts(perPage: 50) { id } }", context: { request: mock_request })
+
+    queries = count_queries do
+      BackendSchema.execute("{ posts(perPage: 50) { id } }", context: { request: mock_request })
+    end
+
+    assert_equal 0, queries, "Expected cache hit on second request with same per_page"
+  ensure
+    Rails.cache = original_cache
   end
 
   private

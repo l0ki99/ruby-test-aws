@@ -216,7 +216,7 @@ function App() {
 
       <Paper>
         <Stack padding={2} marginY={2}>
-          {!error && (
+          {!error?.networkError && !(error?.graphQLErrors?.length) && (
             <>
               <Typography variant={'h4'}>
                 Post count: {loading && <CircularProgress />}{' '}
@@ -234,13 +234,17 @@ function App() {
               </Typography>
             </>
           )}
-          {error && (
+          {error?.networkError && (
             <Typography>
-              Something went wrong loading the post data. Is rails running (
-              <code>rails s</code> from the <code>backend</code> folder)?{' '}
-              {error.message}
+              Network error: unable to reach the server. Is rails running (
+              <code>rails s</code> from the <code>backend</code> folder)?
             </Typography>
           )}
+          {error?.graphQLErrors?.map((e, i) => (
+            <Typography key={i}>
+              {e.message}
+            </Typography>
+          ))}
         </Stack>
       </Paper>
 
