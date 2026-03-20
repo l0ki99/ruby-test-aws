@@ -54,7 +54,59 @@ class Resolvers::PostResolverTest < ActiveSupport::TestCase
     extra_user.destroy
   end
 
-  test "caches results so a second request issues no additional post/comment queries" do
+  test "query count does not grow as the number of distinct comment authors increases" do
+    extra_users = 5.times.map { |i| User.create!(email: "author#{i}@example.com", name: "Author #{i}") }
+    extra_users.each { |u| @post.comments.create!(content: "By #{u.name}", user: u) }
+
+    queries = count_queries do
+      BackendSchema.execute(QUERY, context: { request: mock_request })
+    end
+
+    # Still at most 3 queries regardless of how many distinct authors commented.
+    # If includes(:user) were removed from CommentsSource, this would be 2 + N.
+    assert queries <= 3, "Expected at most 3 load queries with #{extra_users.size} distinct authors, got #{queries}. Possible N+1 on author loading."
+  ensure
+    extra_users&.each { |u| u.comments.destroy_all; u.destroy }
+  end
+
+  test "query count does not grow as comment volume increases" do
+    queries_small = count_queries do
+      BackendSchema.execute(QUERY, context: { request: mock_request })
+    end
+
+    199.times { |i| @post.comments.create!(content: "Comment #{i}", user: @user) }
+
+    queries_large = count_queries do
+      BackendSchema.execute(QUERY, context: { request: mock_request })
+    end
+
+    assert_equal queries_small, queries_large,
+      "Query count grew with comment volume (#{queries_small} → #{queries_large}). Possible N+1."
+  end
+
+  test "query count does not grow as the number of posts with many comments increases" do
+    extra_users = 4.times.map { |i| User.create!(email: "multi#{i}@example.com", name: "Multi #{i}") }
+    extra_posts = extra_users.map { |u| Post.create!(title: "Post by #{u.name}", content: "Content", user: u) }
+    extra_posts.each { |p| 50.times { |i| p.comments.create!(content: "Comment #{i}", user: @user) } }
+
+    queries_few_posts = count_queries do
+      BackendSchema.execute(QUERY, context: { request: mock_request })
+    end
+
+    extra_posts2 = extra_users.map { |u| Post.create!(title: "More by #{u.name}", content: "Content", user: u) }
+    extra_posts2.each { |p| 50.times { |i| p.comments.create!(content: "Comment #{i}", user: @user) } }
+
+    queries_many_posts = count_queries do
+      BackendSchema.execute(QUERY, context: { request: mock_request })
+    end
+
+    assert_equal queries_few_posts, queries_many_posts,
+      "Query count grew with post volume (#{queries_few_posts} → #{queries_many_posts}). Dataloader is not batching across posts."
+  ensure
+    extra_users&.each(&:destroy)
+  end
+
+  test "caches posts so a second request issues no post queries, with comments fetched in a fixed number of queries" do
     # The test environment uses NullStore by default, so we swap in a real cache.
     original_cache = Rails.cache
     Rails.cache = ActiveSupport::Cache::MemoryStore.new
@@ -66,10 +118,11 @@ class Resolvers::PostResolverTest < ActiveSupport::TestCase
       BackendSchema.execute(QUERY, context: { request: mock_request })
     end
 
-    # After the cache is warm, no model loads should occur — associations are
-    # serialized with the cached records.
-    assert_equal 0, queries_second_request,
-                 "Expected 0 load queries on a cached request, got #{queries_second_request}."
+    # Posts are served from cache (0 post queries). Comments and their authors
+    # are batch-loaded by the dataloader in at most 2 queries (comments + users),
+    # regardless of how many posts are on the page.
+    assert queries_second_request <= 2,
+           "Expected at most 2 load queries on a cached request (comments + users), got #{queries_second_request}."
   ensure
     Rails.cache = original_cache
   end

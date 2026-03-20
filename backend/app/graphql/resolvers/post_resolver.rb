@@ -45,7 +45,7 @@ module Resolvers
         offset = (page - 1) * clamped_per_page
         order = SORT_ORDER[sort_by]
 
-        scope = Post.includes(comments: :user)
+        scope = Post.all
         scope = scope.joins(:user) if sort_by.start_with?("AUTHOR")
         scope.order(order).offset(offset).limit(clamped_per_page).to_a
       end
