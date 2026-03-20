@@ -16,13 +16,18 @@ module Mutations
     def resolve(title:, content:)
       sleep 3
       
+      input_errors = []
+      input_errors << "Title can't be blank" if title.blank?
+      input_errors << "Content can't be blank" if content.blank?
+      return { post: nil, errors: input_errors } if input_errors.any?
+
       recent_posts_count = Post.where(user: User.first)
                              .where('created_at > ?', 1.hour.ago)
                              .count
       if recent_posts_count >= MAX_POSTS_PER_HOUR
         return { post: nil, errors: ['Rate limit exceeded. Try again later.'] }
       end
-      
+
       if content.length < CONTENT_MIN_LENGTH
         return { post: nil, errors: ["Content too short. Minimum #{CONTENT_MIN_LENGTH} characters required."] }
       end
@@ -41,19 +46,18 @@ module Mutations
       end
       
       
-      post = Post.new(
-        title:,
-        content:,
-        user: User.first
-      )
+      user = User.first
+      return { post: nil, errors: ["Unable to create post. Please try again."] } if user.nil?
+
+      post = Post.new(title:, content:, user:)
 
       ActiveRecord::Base.transaction do
         post.save!
       end
-      
+
       { post: post, errors: [] }
-    rescue ActiveRecord::RecordInvalid => e
-      { post: nil, errors: e.record.errors.full_messages }
+    rescue ActiveRecord::RecordInvalid
+      { post: nil, errors: ["Unable to create post. Please try again."] }
     end
   end
 end
