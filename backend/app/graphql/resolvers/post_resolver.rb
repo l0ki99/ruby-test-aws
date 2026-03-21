@@ -10,10 +10,10 @@ module Resolvers
     MAX_POSTS_PER_PAGE = 50
     RATE_LIMIT_MAX_REQUESTS = 100
     SORT_ORDER = {
-      "NEWEST"    => "posts.created_at DESC",
-      "OLDEST"    => "posts.created_at ASC",
-      "AUTHOR_AZ" => "users.name ASC",
-      "AUTHOR_ZA" => "users.name DESC",
+      "NEWEST"    => Arel.sql("posts.created_at DESC"),
+      "OLDEST"    => Arel.sql("posts.created_at ASC"),
+      "AUTHOR_AZ" => Arel.sql("users.name ASC"),
+      "AUTHOR_ZA" => Arel.sql("users.name DESC"),
     }.freeze
 
     argument :page, Integer, required: false, default_value: 1

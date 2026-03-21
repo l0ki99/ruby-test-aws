@@ -20,6 +20,8 @@ module Types
 
     field :posts, resolver: Resolvers::PostResolver
 
+    field :trending_posts, resolver: Resolvers::TrendingPostResolver
+
     field :user, resolver: Resolvers::UserResolver
 
   end

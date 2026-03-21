@@ -16,6 +16,7 @@ module Types
     def comments(limit:, offset:)
       dataloader.with(Sources::CommentsSource, limit: limit, offset: offset).load(object.id)
     end
+    field :last_comment_at, GraphQL::Types::ISO8601DateTime, null: true
     field :created_at, GraphQL::Types::ISO8601DateTime, null: false
     field :updated_at, GraphQL::Types::ISO8601DateTime, null: false
   end

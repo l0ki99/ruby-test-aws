@@ -76,6 +76,27 @@ class Types::PostTypeTest < ActiveSupport::TestCase
     assert_equal all_ids[1..2], post_result["comments"].map { |c| c["id"] }
   end
 
+  test "lastCommentAt is null for a post with no comments" do
+    post = Post.create!(title: "Test", content: "Content", user: @user)
+
+    result = BackendSchema.execute("{ posts { id lastCommentAt } }", context: CONTEXT)
+    post_result = result["data"]["posts"].find { |p| p["id"] == post.id.to_s }
+
+    assert_nil post_result["lastCommentAt"]
+  end
+
+  test "lastCommentAt reflects the most recent comment timestamp" do
+    post = Post.create!(title: "Test", content: "Content", user: @user)
+    post.comments.create!(content: "First",  user: @user, created_at: 2.hours.ago)
+    latest = post.comments.create!(content: "Latest", user: @user)
+
+    result = BackendSchema.execute("{ posts { id lastCommentAt } }", context: CONTEXT)
+    post_result = result["data"]["posts"].find { |p| p["id"] == post.id.to_s }
+
+    assert_not_nil post_result["lastCommentAt"]
+    assert_equal latest.created_at.iso8601, post_result["lastCommentAt"]
+  end
+
   test "comments returns newest first" do
     post = Post.create!(title: "Test", content: "Content", user: @user)
     first  = post.comments.create!(content: "First",  user: @user)
