@@ -40,7 +40,8 @@ module Resolvers
       end
 
       clamped_per_page = [per_page, MAX_POSTS_PER_PAGE].min
-      cache_key = "all_posts_#{page}_#{clamped_per_page}_#{sort_by}_#{Post.maximum(:updated_at)&.to_i}"
+      version = Rails.cache.fetch("posts_cache_version") { Time.current.to_i }
+      cache_key = "all_posts_#{page}_#{clamped_per_page}_#{sort_by}_#{version}"
       posts = Rails.cache.fetch(cache_key, expires_in: CACHE_EXPIRY) do
         offset = (page - 1) * clamped_per_page
         order = SORT_ORDER[sort_by]
@@ -55,15 +56,16 @@ module Resolvers
         PROFANITY_LIST.each do |word|
           censored_content.gsub!(/#{word}/i, '*' * word.length) if censored_content.include?(word)
         end
-        post.content = censored_content
-        
-        word_count = post.content.split.size
+
+        word_count = censored_content.split.size
         reading_minutes = (word_count / 200.0).ceil
-        post.define_singleton_method(:reading_time) do
-          "#{reading_minutes} min read"
-        end
-        
-        post
+
+        presented = post.dup
+        presented.id = post.id
+        presented.content = censored_content
+        presented.define_singleton_method(:reading_time) { "#{reading_minutes} min read" }
+        presented.readonly!
+        presented
       end
       
       Rails.logger.info("Posts query executed in #{Time.current - started_at} seconds")

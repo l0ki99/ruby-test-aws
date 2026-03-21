@@ -65,4 +65,47 @@ class CreatePostMutationTest < ActiveSupport::TestCase
       assert_equal ["Unable to create post. Please try again."], errors
     end
   end
+
+  test "returns an error when content is below minimum length" do
+    short_content = "A" * (Mutations::CreatePostMutation::CONTENT_MIN_LENGTH - 1)
+    result = BackendSchema.execute(MUTATION, variables: { title: "My Post", content: short_content })
+    errors = result.dig("data", "createPost", "errors")
+
+    assert_includes errors.first, "Content too short"
+  end
+
+  test "returns an error when content exceeds maximum length" do
+    long_content = "A" * (Mutations::CreatePostMutation::CONTENT_MAX_LENGTH + 1)
+    result = BackendSchema.execute(MUTATION, variables: { title: "My Post", content: long_content })
+    errors = result.dig("data", "createPost", "errors")
+
+    assert_includes errors.first, "Content too long"
+  end
+
+  test "returns an error when content contains spam keywords" do
+    spammy_content = "A" * 40 + " click here to win"
+    result = BackendSchema.execute(MUTATION, variables: { title: "My Post", content: spammy_content })
+    errors = result.dig("data", "createPost", "errors")
+
+    assert_includes errors.first, "spam"
+  end
+
+  test "returns an error when rate limit is exceeded" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+
+    Post.stub(:where, ->(*) {
+      obj = Object.new
+      obj.define_singleton_method(:where) { |*| obj }
+      obj.define_singleton_method(:count) { Mutations::CreatePostMutation::MAX_POSTS_PER_HOUR }
+      obj
+    }) do
+      result = BackendSchema.execute(MUTATION, variables: { title: "My Post", content: VALID_CONTENT })
+      errors = result.dig("data", "createPost", "errors")
+
+      assert_includes errors.first, "Rate limit exceeded"
+    end
+  ensure
+    Rails.cache = original_cache
+  end
 end

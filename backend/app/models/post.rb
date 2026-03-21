@@ -5,4 +5,12 @@ class Post < ApplicationRecord
 
   validates :title, presence: true
   validates :content, presence: true
+
+  after_save :bust_posts_cache
+
+  private
+
+  def bust_posts_cache
+    Rails.cache.delete("posts_cache_version")
+  end
 end

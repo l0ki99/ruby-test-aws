@@ -12,10 +12,8 @@ module Mutations
     MAX_POSTS_PER_HOUR = 5
     CONTENT_MIN_LENGTH = 50
     CONTENT_MAX_LENGTH = 5000
-    
+
     def resolve(title:, content:)
-      sleep 3
-      
       input_errors = []
       input_errors << "Title can't be blank" if title.blank?
       input_errors << "Content can't be blank" if content.blank?
@@ -51,9 +49,7 @@ module Mutations
 
       post = Post.new(title:, content:, user:)
 
-      ActiveRecord::Base.transaction do
-        post.save!
-      end
+      post.save!
 
       { post: post, errors: [] }
     rescue ActiveRecord::RecordInvalid

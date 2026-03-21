@@ -57,6 +57,19 @@ class PostTest < ActiveSupport::TestCase
     assert_equal [comment2, comment1], @post.comments.order(created_at: :desc)
   end
 
+  test "saving a post busts the posts cache version" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    Rails.cache.write("posts_cache_version", 12345)
+
+    @post.save!
+
+    assert_nil Rails.cache.read("posts_cache_version"),
+      "Expected posts_cache_version to be deleted after saving a post"
+  ensure
+    Rails.cache = original_cache
+  end
+
   def teardown
     @user.destroy
   end

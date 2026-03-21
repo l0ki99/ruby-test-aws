@@ -264,6 +264,25 @@ class Resolvers::PostResolverTest < ActiveSupport::TestCase
     user_a.destroy
   end
 
+  test "censors profanity words in post content" do
+    profane_post = Post.create!(
+      title: "Profane Post",
+      content: "This contains bad_word1 and bad_word2 in it",
+      user: @user
+    )
+
+    result = BackendSchema.execute("{ posts { id content } }", context: { request: mock_request })
+    post_data = result["data"]["posts"].find { |p| p["id"] == profane_post.id.to_s }
+
+    assert_not_nil post_data
+    assert_includes post_data["content"], "*" * "bad_word1".length
+    assert_includes post_data["content"], "*" * "bad_word2".length
+    assert_not_includes post_data["content"], "bad_word1"
+    assert_not_includes post_data["content"], "bad_word2"
+  ensure
+    profane_post&.destroy
+  end
+
   test "sort_by is included in the cache key so different sorts are cached separately" do
     original_cache = Rails.cache
     Rails.cache = ActiveSupport::Cache::MemoryStore.new
