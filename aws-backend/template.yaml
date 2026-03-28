@@ -1,0 +1,180 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/aws/serverless-application-model/main/samtranslator/schema/schema.json
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: jobber-backend - Rails GraphQL API on Lambda + SQLite on EFS
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment (dev, qa, prod)
+  SecretKeyBase:
+    Type: String
+    NoEcho: true
+    Default: dev-secret-key-base-replace-for-production
+  MigrateSecret:
+    Type: String
+    NoEcho: true
+    Default: dev-migrate-secret-replace-for-production
+
+Globals:
+  Function:
+    Runtime: ruby3.3
+    Timeout: 30
+    MemorySize: 512
+    VpcConfig:
+      SecurityGroupIds:
+        - !Ref LambdaSg
+      SubnetIds:
+        - !Ref PrivateSubnet
+    FileSystemConfigs:
+      - Arn: !GetAtt EfsAccessPoint.Arn
+        LocalMountPath: /mnt/efs
+    Environment:
+      Variables:
+        RAILS_ENV: production
+        RAILS_LOG_TO_STDOUT: "1"
+        SECRET_KEY_BASE: !Ref SecretKeyBase
+        DATABASE_URL: sqlite3:/mnt/efs/production.sqlite3
+        MIGRATE_SECRET: !Ref MigrateSecret
+
+Resources:
+
+  # ── VPC (single AZ — no RDS requirement so 1 subnet is sufficient) ───────────
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "jobber-${Environment}"
+
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: !Sub "jobber-${Environment}-private"
+
+  # ── Security Groups ───────────────────────────────────────────────────────────
+
+  LambdaSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Jobber backend Lambda
+      VpcId: !Ref Vpc
+
+  EfsSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Jobber EFS
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref LambdaSg
+
+  VpcEndpointSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: CloudWatch Logs VPC endpoint
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref LambdaSg
+
+  # ── CloudWatch Logs VPC endpoint (Lambda in VPC needs this to ship logs) ──────
+
+  CloudWatchLogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcId: !Ref Vpc
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet
+      SecurityGroupIds:
+        - !Ref VpcEndpointSg
+      PrivateDnsEnabled: true
+
+  # ── EFS ───────────────────────────────────────────────────────────────────────
+
+  EfsFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub "jobber-${Environment}"
+
+  EfsMountTarget:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref PrivateSubnet
+      SecurityGroups:
+        - !Ref EfsSg
+
+  EfsAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      PosixUser:
+        Uid: "1000"
+        Gid: "1000"
+      RootDirectory:
+        CreationInfo:
+          OwnerUid: "1000"
+          OwnerGid: "1000"
+          Permissions: "755"
+        Path: /jobber
+
+  # ── Lambda Functions ──────────────────────────────────────────────────────────
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: EfsMountTarget
+    Properties:
+      FunctionName: !Sub "jobber-backend-${Environment}"
+      Handler: lambda_function.handler
+      CodeUri: src/
+      Policies:
+        - Statement:
+          - Effect: Allow
+            Action:
+              - elasticfilesystem:ClientMount
+              - elasticfilesystem:ClientWrite
+              - elasticfilesystem:ClientRootAccess
+            Resource: !GetAtt EfsFileSystem.Arn
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowCredentials: false
+          AllowHeaders:
+            - Content-Type
+            - Authorization
+          AllowMethods:
+            - "*"
+          AllowOrigins:
+            - "*"
+          MaxAge: 86400
+
+
+Outputs:
+  ApiUrl:
+    Description: Backend Lambda function URL
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl
+
+  BackendFunctionName:
+    Description: Backend Lambda function name
+    Value: !Ref ApiFunction

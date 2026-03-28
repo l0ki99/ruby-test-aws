@@ -1,19 +1,26 @@
+networks:
+  jobber-net:
+    name: jobber-net
+
 services:
+  # ── Rails dev server (SQLite, hot-reload) ───────────────────────────────────
   backend:
-    build: ./backend
+    build: ./aws-backend/src
     volumes:
-      - ./backend:/backend
+      - ./aws-backend/src:/backend
     command: ['rails', 'server', '-b', '0.0.0.0', '-p', '8090']
     ports:
       - '8090:8090'
     environment:
       - DATABASE_URL=sqlite3:db/development.sqlite3
       - RAILS_ENV=development
+    networks:
+      - jobber-net
 
   frontend:
-    build: ./frontend
+    build: ./aws-frontend/src
     volumes:
-      - ./frontend:/frontend
+      - ./aws-frontend/src:/frontend
       - /frontend/node_modules
     ports:
       - '8091:8091'
@@ -21,3 +28,38 @@ services:
       - NODE_ENV=development
     depends_on:
       - backend
+    networks:
+      - jobber-net
+
+  # ── PostgreSQL — used by sam local (aws-backend/run.sh) ─────────────────────
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: jobber_development
+      POSTGRES_USER: jobber
+      POSTGRES_PASSWORD: password
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - jobber-net
+
+  # ── LocalStack — emulates S3/CloudFront for local frontend testing ───────────
+  localstack:
+    image: localstack/localstack
+    ports:
+      - '4566:4566'
+    environment:
+      - SERVICES=s3,cloudfront
+      - DEFAULT_REGION=ca-central-1
+      - AWS_DEFAULT_REGION=ca-central-1
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - jobber-net
+
+volumes:
+  postgres-data:
+  localstack-data:

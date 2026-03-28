@@ -1,0 +1,4 @@
+{
+  "Environment": "dev",
+  "MigrateSecret": "dev-migrate-secret"
+}

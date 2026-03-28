@@ -1,0 +1,10 @@
+.aws-sam/
+src/vendor/
+src/.bundle/
+src/log/
+src/tmp/
+src/db/*.sqlite3
+src/.sam.pid
+src/.sam.log
+.sam.pid
+.sam.log

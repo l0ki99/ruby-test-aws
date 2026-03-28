@@ -1,0 +1,5 @@
+src/node_modules/
+src/dist/
+src/.env
+src/.env.local
+src/.env.local.bak
