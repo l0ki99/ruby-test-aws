@@ -1,10 +1,9 @@
-import {createLazyFileRoute} from '@tanstack/react-router';
-import App from '../App';
+import {createLazyFileRoute, Navigate} from '@tanstack/react-router';
 
 export const Route = createLazyFileRoute('/')({
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  return <App />;
+  return <Navigate to="/posts" />;
 }
